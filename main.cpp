@@ -24,6 +24,8 @@
 #include <fstream>
 #include <cassert>
 #include <cstdlib>
+#include <string>
+#include <iostream>
 
 using namespace std;
 
@@ -39,29 +41,34 @@ struct Drand48
 
 void test(const char* const filename, const unsigned width, const unsigned height, const bool faure)
 {
-    ofstream out(filename);
-    assert(out);
-
     // Initialize the sampler, either with Faure permutations or randomized digit permutations.
     Halton_sampler halton_sampler;
     if (faure)
     {
         halton_sampler.init_faure();
     }
+    /*
     else
     {
         Drand48 rng;
         halton_sampler.init_random(rng);
     }
+    */
 
     // Enumerate samples per pixel for the given resolution.
     const Halton_enum halton_enum(width, height);
-    const unsigned samples_per_pixel = 4;
+    const unsigned samples_per_pixel = 256;
     assert(samples_per_pixel < halton_enum.get_max_samples_per_pixel());
     for (unsigned y = 0; y < height; ++y) // Iterate over rows.
     {
         for (unsigned x = 0; x < width; ++x) // Iterate over columns.
         {
+	    if (x > 1 || y > 1) continue;
+	    std::string fname = std::string(filename) + std::to_string(x) + std::string("_") + std::to_string(y) + std::string(".csv");
+	    ofstream out;
+	    out.open(fname.c_str());
+	    std::cout << "writing out : " << fname << std::endl;
+	    assert(out);
             for (unsigned i = 0; i < samples_per_pixel; ++i) // Iterate over samples in the pixel.
             {
                 // Retrieve the index of the corresponding sample.
@@ -70,6 +77,9 @@ void test(const char* const filename, const unsigned width, const unsigned heigh
                 const float sx = halton_sampler.sample(0, index);
                 const float sy = halton_sampler.sample(1, index);
                 const float sz = halton_sampler.sample(2, index);
+		const float st = halton_sampler.sample(3, index);
+		const float su = halton_sampler.sample(4, index);
+		const float sv = halton_sampler.sample(5, index);
                 // Rescale the first two components to match the pixel raster.
                 const float rx = halton_enum.scale_x(sx);
                 const float ry = halton_enum.scale_y(sy);
@@ -78,19 +88,20 @@ void test(const char* const filename, const unsigned width, const unsigned heigh
                 assert(x <= rx + 1e-3f && rx - 1e-3f < x + 1);
                 assert(y <= ry + 1e-3f && ry - 1e-3f < y + 1);
                 // Finally, write the samples to the output stream, in gnuplot format.
-                out << rx << " " << ry << " " << sz << endl;
+		out << rx << "," << ry << "," << sz << " , " << st << " , " << su << " , " << sv << std::endl;
             }
+	    out.close();
         }
     }
 
-    out.close();
+   
 }
 
 int main(int, char**)
 {
-    test("faure.dat", 640, 480, true);
-    srand48(5784); // Make reproducible.
-    test("random.dat", 2048, 1152, false);
+    test("faure", 256, 256, true);
+    //srand48(5784); // Make reproducible.
+    //test("random.dat", 2048, 1152, false);
     return 0;
 }
 
